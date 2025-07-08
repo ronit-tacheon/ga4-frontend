@@ -122,7 +122,7 @@ const OAuthGoogle: React.FC = () => {
       
       console.log('Session data:', session);
       console.log('🔍 Backend URL:', import.meta.env.VITE_BACKEND_URL); // Debug log
-      const backendUrl: string = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      const backendUrl: string = 'https://ga4-mcp-server-792865537878.us-central1.run.app';
       const callbackUrl = new URL('/callback', backendUrl);
       console.log('🔍 Full callback URL:', callbackUrl.toString()); // Debug log
 
