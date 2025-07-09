@@ -113,8 +113,13 @@ const OAuthGoogle: React.FC = () => {
         provider: 'google',
         options: { 
           redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'openid email profile https://www.googleapis.com/auth/analytics.readonly'
-        },
+          scopes: 'openid email profile https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/analytics.manage.users.readonly',
+          queryParams: {
+            access_type: 'offline',
+            include_granted_scopes: 'true'
+          }
+        }
+        
       });
 
       if (authError) {
