@@ -20,6 +20,40 @@ interface CallbackResponse {
   redirectUrl?: string;
 }
 
+interface GoogleCredentials {
+  access_token: string;
+  refresh_token: string | null;
+  expires_in: number;
+  token_type: string;
+  scope: string;
+}
+
+interface GoogleProfile {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  email_verified: boolean;
+  locale?: string;
+  hd?: string; // Hosted domain (for G Workspace)
+}
+
+interface ClientMetadata {
+  timestamp: string;
+  user_agent: string;
+  screen_resolution: string;
+  timezone: string;
+  language: string;
+  referrer: string;
+}
+
+interface EnhancedSessionData {
+  session: Session;
+  google_credentials: GoogleCredentials;
+  google_profile: GoogleProfile;
+  client_metadata: ClientMetadata;
+}
+
 // ---- Supabase config ----
 const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -78,7 +112,8 @@ const OAuthGoogle: React.FC = () => {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { 
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'openid email profile https://www.googleapis.com/auth/analytics.readonly'
         },
       });
 
@@ -120,11 +155,49 @@ const OAuthGoogle: React.FC = () => {
       const oauthParams: OAuthParams = JSON.parse(storedParams);
       const session: Session = data.session;
       
-      console.log('Session data:', session);
-      console.log('🔍 Backend URL:', import.meta.env.VITE_BACKEND_URL); // Debug log
+      // 🆕 Extract comprehensive session data
+      const enhancedSessionData: EnhancedSessionData = {
+        // Original session
+        session: session,
+        
+        // 🆕 Google-specific tokens and profile
+        google_credentials: {
+          access_token: session.provider_token || '',
+          refresh_token: session.provider_refresh_token || null,
+          expires_in: session.expires_in || 3600,
+          token_type: session.token_type || 'Bearer',
+          scope: 'https://www.googleapis.com/auth/analytics.readonly'
+        },
+        
+        // 🆕 User profile from Google
+        google_profile: {
+          id: session.user.user_metadata.provider_id || session.user.id,
+          email: session.user.email || '',
+          name: session.user.user_metadata.full_name || session.user.user_metadata.name || '',
+          picture: session.user.user_metadata.avatar_url || session.user.user_metadata.picture || '',
+          email_verified: session.user.user_metadata.email_verified || false,
+          locale: session.user.user_metadata.locale,
+          hd: session.user.user_metadata.custom_claims?.hd // Hosted domain (for G Workspace)
+        },
+        
+        // 🆕 Client metadata
+        client_metadata: {
+          timestamp: new Date().toISOString(),
+          user_agent: navigator.userAgent,
+          screen_resolution: `${screen.width}x${screen.height}`,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          language: navigator.language,
+          referrer: document.referrer || 'direct'
+        }
+      };
+      
+      console.log('Enhanced session data:', enhancedSessionData);
+      console.log('🔍 Google credentials:', enhancedSessionData.google_credentials);
+      console.log('🔍 Google profile:', enhancedSessionData.google_profile);
+      
       const backendUrl: string = 'https://ga4-mcp-server-792865537878.us-central1.run.app';
       const callbackUrl = new URL('/callback', backendUrl);
-      console.log('🔍 Full callback URL:', callbackUrl.toString()); // Debug log
+      console.log('🔍 Full callback URL:', callbackUrl.toString());
 
       // Add OAuth params as query parameters
       Object.entries(oauthParams).forEach(([key, value]) => {
@@ -133,14 +206,15 @@ const OAuthGoogle: React.FC = () => {
         }
       });
 
+      // 🆕 Send enhanced data to backend
       const response = await axios.post<CallbackResponse>(
         callbackUrl.toString(), 
-        { session },
+        enhancedSessionData,  // ← Enhanced session data
         {
           headers: {
             'Content-Type': 'application/json'
           },
-          timeout: 10000 // 10 second timeout
+          timeout: 15000 // Increased timeout for processing
         }
       );
 
@@ -151,13 +225,19 @@ const OAuthGoogle: React.FC = () => {
       
       // If backend provides a redirect URL, use it
       if (response.data.redirectUrl) {
+        console.log('Redirecting to:', response.data.redirectUrl);
         window.location.href = response.data.redirectUrl;
+      } else {
+        setError('No redirect URL provided by server');
+        setIsLoading(false);
       }
       
     } catch (err) {
       console.error('Callback POST failed:', err);
       if (axios.isAxiosError(err)) {
-        setError(`Authentication failed: ${err.response?.data?.message || err.message}`);
+        const errorMessage = err.response?.data?.message || err.message;
+        const statusCode = err.response?.status;
+        setError(`Authentication failed (${statusCode}): ${errorMessage}`);
       } else {
         setError('An unexpected error occurred during authentication');
       }
@@ -170,22 +250,32 @@ const OAuthGoogle: React.FC = () => {
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <div style={{ color: 'red', marginBottom: '1rem' }}>
+      <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ 
+          color: '#dc3545', 
+          marginBottom: '1rem',
+          padding: '1rem',
+          backgroundColor: '#f8d7da',
+          border: '1px solid #f5c6cb',
+          borderRadius: '8px'
+        }}>
           <strong>Error:</strong> {error}
         </div>
         <button 
           onClick={() => {
             setError(null);
+            sessionStorage.removeItem('oauth_params');
             window.location.href = '/';
           }}
           style={{
-            padding: '8px 16px',
+            padding: '12px 24px',
             backgroundColor: '#6c757d',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '500'
           }}
         >
           Go Back
@@ -196,18 +286,29 @@ const OAuthGoogle: React.FC = () => {
 
   if (currentPath === '/auth/callback') {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
           <div className="spinner" style={{
             border: '4px solid #f3f3f3',
-            borderTop: '4px solid #3498db',
+            borderTop: '4px solid #4285f4',
             borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 2s linear infinite'
+            width: '48px',
+            height: '48px',
+            animation: 'spin 1s linear infinite'
           }} />
-          <p>Authenticating with Google...</p>
-          <div>Please wait while we complete the authorization...</div>
+          <div>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Processing Authentication</h3>
+            <p style={{ margin: '0', color: '#666' }}>
+              Please wait while we complete the authorization with Google Analytics...
+            </p>
+          </div>
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#888',
+            fontStyle: 'italic'
+          }}>
+            This may take a few moments
+          </div>
         </div>
         <style>{`
           @keyframes spin {
@@ -221,46 +322,111 @@ const OAuthGoogle: React.FC = () => {
 
   if (currentPath === '/authorize') {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
-        <h2>Authorize Application</h2>
-        <p>An application is requesting access to your data.</p>
+      <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ color: '#333', marginBottom: '0.5rem' }}>Authorize GA4 MCP Server</h2>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            An application is requesting access to your Google Analytics data.
+          </p>
+        </div>
         
         {oauthParams && (
           <div style={{ 
-            margin: '1rem 0', 
-            padding: '1rem', 
+            margin: '2rem 0', 
+            padding: '1.5rem', 
             backgroundColor: '#f8f9fa', 
-            borderRadius: '8px',
+            borderRadius: '12px',
             border: '1px solid #dee2e6',
             textAlign: 'left'
           }}>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <strong>Client ID:</strong> <code>{oauthParams.client_id}</code>
+            <h3 style={{ margin: '0 0 1rem 0', color: '#495057', fontSize: '18px' }}>
+              Authorization Details
+            </h3>
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Client ID:</strong> 
+              <code style={{ 
+                marginLeft: '0.5rem',
+                padding: '2px 6px',
+                backgroundColor: '#e9ecef',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}>
+                {oauthParams.client_id}
+              </code>
             </div>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <strong>Scope:</strong> <code>{oauthParams.scope || 'scrape'}</code>
+            <div style={{ marginBottom: '1rem' }}>
+              <strong>Scope:</strong> 
+              <code style={{ 
+                marginLeft: '0.5rem',
+                padding: '2px 6px',
+                backgroundColor: '#e9ecef',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}>
+                {oauthParams.scope || 'scrape'}
+              </code>
             </div>
             <div>
-              <strong>Redirect URI:</strong> <code style={{ wordBreak: 'break-all' }}>
+              <strong>Redirect URI:</strong> 
+              <code style={{ 
+                marginLeft: '0.5rem',
+                padding: '2px 6px',
+                backgroundColor: '#e9ecef',
+                borderRadius: '4px',
+                fontSize: '14px',
+                wordBreak: 'break-all',
+                display: 'inline-block',
+                maxWidth: '100%'
+              }}>
                 {oauthParams.redirect_uri}
               </code>
             </div>
           </div>
         )}
+
+        <div style={{ 
+          margin: '2rem 0',
+          padding: '1rem',
+          backgroundColor: '#e7f3ff',
+          border: '1px solid #b3d9ff',
+          borderRadius: '8px',
+          textAlign: 'left'
+        }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#0066cc' }}>
+            🔐 What you're granting access to:
+          </h4>
+          <ul style={{ margin: '0', paddingLeft: '1.5rem', color: '#333' }}>
+            <li>Read access to your Google Analytics data</li>
+            <li>View your Google profile information</li>
+            <li>Access to generate analytics reports</li>
+          </ul>
+        </div>
         
         <button 
           onClick={handleLogin}
           disabled={isLoading || !oauthParams}
           style={{
-            padding: '12px 24px',
-            fontSize: '16px',
+            padding: '16px 32px',
+            fontSize: '18px',
             backgroundColor: isLoading || !oauthParams ? '#ccc' : '#4285f4',
             color: 'white',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: isLoading || !oauthParams ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s',
-            fontWeight: '500'
+            transition: 'all 0.2s',
+            fontWeight: '600',
+            boxShadow: isLoading || !oauthParams ? 'none' : '0 2px 4px rgba(66, 133, 244, 0.3)',
+            minWidth: '200px'
+          }}
+          onMouseOver={(e) => {
+            if (!isLoading && oauthParams) {
+              e.currentTarget.style.backgroundColor = '#3367d6';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (!isLoading && oauthParams) {
+              e.currentTarget.style.backgroundColor = '#4285f4';
+            }
           }}
         >
           {isLoading ? (
@@ -276,8 +442,14 @@ const OAuthGoogle: React.FC = () => {
           )}
         </button>
         
-        <div style={{ marginTop: '1rem', fontSize: '14px', color: '#666' }}>
-          By clicking "Sign in with Google", you agree to grant the requested permissions.
+        <div style={{ 
+          marginTop: '2rem', 
+          fontSize: '14px', 
+          color: '#666',
+          lineHeight: '1.4'
+        }}>
+          By clicking "Sign in with Google", you agree to grant the requested permissions 
+          and allow this application to access your Google Analytics data.
         </div>
       </div>
     );
@@ -285,10 +457,26 @@ const OAuthGoogle: React.FC = () => {
 
   // Default view for other routes
   return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <p>OAuth component loaded</p>
-      <div style={{ fontSize: '14px', color: '#666', marginTop: '1rem' }}>
-        Current path: <code>{currentPath}</code>
+    <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
+      <div style={{
+        padding: '2rem',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '12px',
+        border: '1px solid #dee2e6'
+      }}>
+        <h3 style={{ color: '#333', marginBottom: '1rem' }}>GA4 MCP OAuth Server</h3>
+        <p style={{ color: '#666', marginBottom: '1rem' }}>
+          OAuth component loaded and ready for authorization requests.
+        </p>
+        <div style={{ fontSize: '14px', color: '#888' }}>
+          Current path: <code style={{ 
+            padding: '2px 6px',
+            backgroundColor: '#e9ecef',
+            borderRadius: '4px'
+          }}>
+            {currentPath}
+          </code>
+        </div>
       </div>
     </div>
   );
