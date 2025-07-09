@@ -116,7 +116,7 @@ const OAuthGoogle: React.FC = () => {
           scopes: 'openid email profile https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/analytics.manage.users.readonly',
           queryParams: {
             access_type: 'offline',
-            include_granted_scopes: 'true'
+            prompt: 'consent',
           }
         }
         
