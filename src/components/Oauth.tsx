@@ -234,7 +234,7 @@ const OAuthGoogle: React.FC = () => {
       sessionStorage.removeItem('oauth_params');
 
       // Write the code to redirect to /payment
-      const redirectUri = oauthParams.redirect_uri;
+      const redirectUri = response.data.redirectUrl
       // redirection changed earlier it was to original redirectUri that we are passing to payment page now
       navigate(`/payment?redirect_uri=${encodeURIComponent(redirectUri || '')}`);
       
