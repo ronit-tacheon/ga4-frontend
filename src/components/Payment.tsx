@@ -72,7 +72,7 @@ const Payment: React.FC<PaymentProps> = ({
   };
 
   const handleBackToHome = () => {
-    window.location.href =""
+    window.location.href ="/"
   };
 
   return (

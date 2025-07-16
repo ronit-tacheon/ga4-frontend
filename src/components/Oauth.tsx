@@ -59,7 +59,7 @@ interface EnhancedSessionData {
 
 
 // ---- Supabase config ----
-const supabaseUrl: string = import.meta.env.VITE_RAZORPAY_KEY_ID;
+const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
