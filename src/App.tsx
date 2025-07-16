@@ -13,7 +13,7 @@ function App() {
           path="/payment"
           element={
             <Payment
-              amount={1}
+              amount={100}
               currency="INR"
               user_email="user@example.com"
             />
