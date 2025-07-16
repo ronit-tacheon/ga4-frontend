@@ -41,7 +41,7 @@ const Payment: React.FC<PaymentProps> = ({
       name: "GA4 Claude Extension",
       description: "Access Google Analytics 4 in Claude",
       handler: function (response: any) {
-        fetch("/payment/verify", {
+        fetch("https://remote-ga4-mcp-229250458092.us-central1.run.app/payment/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
