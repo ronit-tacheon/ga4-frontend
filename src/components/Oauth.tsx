@@ -200,7 +200,7 @@ const OAuthGoogle: React.FC = () => {
       console.log('🔍 Google credentials:', enhancedSessionData.google_credentials);
       console.log('🔍 Google profile:', enhancedSessionData.google_profile);
       
-      const backendUrl: string = 'https://ga4-mcp-server-792865537878.us-central1.run.app';
+      const backendUrl: string = 'https://remote-ga4-mcp-229250458092.us-central1.run.app';
       const callbackUrl = new URL('/callback', backendUrl);
       console.log('🔍 Full callback URL:', callbackUrl.toString());
 
