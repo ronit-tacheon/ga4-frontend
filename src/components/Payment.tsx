@@ -64,7 +64,17 @@ const Payment: React.FC<PaymentProps> = ({
       },
       theme: {
         color: "#0045a0"
+      },
+      modal: {
+      ondismiss: function() {
+        // This ensures the modal can be reopened
+        console.log('Payment modal dismissed');
       }
+    },
+    retry: {
+      enabled: true,
+      max_count: 3
+    }
     };
     
     const rzp1 = new window.Razorpay(options);
