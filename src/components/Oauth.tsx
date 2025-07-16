@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
+// import added
+import { useNavigate } from 'react-router-dom'; // Add this import
 
 // ---- Types ----
 interface OAuthParams {
@@ -54,12 +56,15 @@ interface EnhancedSessionData {
   client_metadata: ClientMetadata;
 }
 
+
+
 // ---- Supabase config ----
-const supabaseUrl: string = import.meta.env.VITE_SUPABASE_URL;
+const supabaseUrl: string = import.meta.env.VITE_RAZORPAY_KEY_ID;
 const supabaseAnonKey: string = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const OAuthGoogle: React.FC = () => {
+  const navigate = useNavigate(); // Add this hook
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [oauthParams, setOauthParams] = useState<OAuthParams | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -227,15 +232,11 @@ const OAuthGoogle: React.FC = () => {
       
       // Clean up
       sessionStorage.removeItem('oauth_params');
-      
-      // If backend provides a redirect URL, use it
-      if (response.data.redirectUrl) {
-        console.log('Redirecting to:', response.data.redirectUrl);
-        window.location.href = response.data.redirectUrl;
-      } else {
-        setError('No redirect URL provided by server');
-        setIsLoading(false);
-      }
+
+      // Write the code to redirect to /payment
+      const redirectUri = oauthParams.redirect_uri;
+      // redirection changed earlier it was to original redirectUri that we are passing to payment page now
+      navigate(`/payment?redirect_uri=${encodeURIComponent(redirectUri || '')}`);
       
     } catch (err) {
       console.error('Callback POST failed:', err);
